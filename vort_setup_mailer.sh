@@ -147,9 +147,9 @@ echo "Creating send.sh for bulk email sending..."
 cat > send.sh <<'EOL'
 #!/bin/bash
 
-# === CONFIGURATION TOGGLES ===
-ATTACHMENT_ENABLED=false   # Set to true to enable attachments
-SEND_AS_HTML=true          # Set to false to send only plain text
+# Configuration toggles
+ATTACHMENT_ENABLED=false
+SEND_AS_HTML=true
 
 # Configuration files
 EMAIL_LIST="list.txt"
@@ -157,7 +157,7 @@ HTML_TEMPLATE="email.html"
 SUBJECT_FILE="subject.txt"
 NAME_FILE="name.txt"
 LOG_FILE="send_log_$(date +%Y%m%d).txt"
-ATTACHMENT_FILE="attachment.pdf"  # Change if needed
+ATTACHMENT_FILE="attachment.pdf"
 
 # Initialize counters
 TOTAL=$(wc -l < "$EMAIL_LIST")
@@ -165,25 +165,20 @@ SUCCESS=0
 FAILED=0
 
 # Verify required files exist
-for file in "$EMAIL_LIST" "$SUBJECT_FILE" "$NAME_FILE"; do
+for file in "$EMAIL_LIST" "$HTML_TEMPLATE" "$SUBJECT_FILE" "$NAME_FILE"; do
     if [ ! -f "$file" ]; then
         echo "Error: Missing $file" | tee -a "$LOG_FILE"
         exit 1
     fi
 done
 
-# Optional: only check HTML template if SEND_AS_HTML is true
-if [ "$SEND_AS_HTML" = true ] && [ ! -f "$HTML_TEMPLATE" ]; then
-    echo "Error: Missing $HTML_TEMPLATE" | tee -a "$LOG_FILE"
-    exit 1
-fi
-
-# Optional: check attachment if enabled
+# If attachment is enabled, check for it
 if [ "$ATTACHMENT_ENABLED" = true ] && [ ! -f "$ATTACHMENT_FILE" ]; then
     echo "Error: Attachment file not found: $ATTACHMENT_FILE" | tee -a "$LOG_FILE"
     exit 1
 fi
 
+# Load subjects and names
 mapfile -t SUBJECTS < "$SUBJECT_FILE"
 mapfile -t NAMES < "$NAME_FILE"
 
@@ -201,10 +196,11 @@ while IFS= read -r email; do
     EMAIL_DOMAIN=$(echo "$CLEAN_EMAIL" | cut -d@ -f2)
     CURRENT_DATE=$(date +%Y-%m-%d)
     BASE64_EMAIL=$(echo -n "$CLEAN_EMAIL" | base64)
+
     RANDOM_NAME=$(get_random_name)
     RANDOM_NUMBER=$(get_random_number)
     SELECTED_SENDER_NAME="${NAMES[$((RANDOM % ${#NAMES[@]}))]}"
-    
+
     SELECTED_SUBJECT="${SUBJECTS[$((RANDOM % ${#SUBJECTS[@]}))]}"
     SELECTED_SUBJECT=$(echo "$SELECTED_SUBJECT" | sed \
         -e "s|{date}|$CURRENT_DATE|g" \
@@ -216,13 +212,25 @@ while IFS= read -r email; do
         -e "s|{random-number}|$RANDOM_NUMBER|g")
 
     echo "Processing: $CLEAN_EMAIL"
-    
-    MESSAGE_ID="<$(date +%s%N).$(openssl rand -hex 8)@$domain>"
-    
-    TEMP_HTML=$(mktemp)
-    TEMP_TEXT=$(mktemp)
 
-    # Generate text body
+    MESSAGE_ID="<$(date +%s%N).$(openssl rand -hex 8)@$domain>"
+
+    TEMP_HTML=$(mktemp)
+    sed \
+        -e "s|{date}|$CURRENT_DATE|g" \
+        -e "s|{recipient-email}|$CLEAN_EMAIL|g" \
+        -e "s|{recipient-user}|$EMAIL_USER|g" \
+        -e "s|{recipient-domain}|$EMAIL_DOMAIN|g" \
+        -e "s|{name}|$RANDOM_NAME|g" \
+        -e "s|{random-name}|$(get_random_name)|g" \
+        -e "s|{random-number}|$RANDOM_NUMBER|g" \
+        -e "s|{sender-email}|$username@$domain|g" \
+        -e "s|{sender-name}|$SELECTED_SENDER_NAME|g" \
+        -e "s|{base64-encryptedrecipents-email}|$BASE64_EMAIL|g" \
+        "$HTML_TEMPLATE" > "$TEMP_HTML"
+
+    # Create plain text version
+    TEMP_TEXT=$(mktemp)
     cat <<EOF > "$TEMP_TEXT"
 Webmail - Mail. Host. Online
 
@@ -239,69 +247,50 @@ You received this email because you are registered. This is to ensure compliance
 Privacy Policy © 2004–2025 Webmail International Ltd.
 EOF
 
-    # Generate HTML body (only if enabled)
+    # Send the email
+    cat <<EOF | /usr/sbin/sendmail -t -oi
+Return-Path: <$username@$domain>
+From: "$SELECTED_SENDER_NAME" <$username@$domain>
+To: <$CLEAN_EMAIL>
+Subject: $SELECTED_SUBJECT
+MIME-Version: 1.0
+Content-Type: multipart/mixed; boundary="MIXED_BOUNDARY"
+
+--MIXED_BOUNDARY
+Content-Type: multipart/alternative; boundary="ALT_BOUNDARY"
+
+--ALT_BOUNDARY
+Content-Type: text/plain; charset=UTF-8
+
+$(cat "$TEMP_TEXT")
+
+EOF
+
     if [ "$SEND_AS_HTML" = true ]; then
-        sed \
-            -e "s|{date}|$CURRENT_DATE|g" \
-            -e "s|{recipient-email}|$CLEAN_EMAIL|g" \
-            -e "s|{recipient-user}|$EMAIL_USER|g" \
-            -e "s|{recipient-domain}|$EMAIL_DOMAIN|g" \
-            -e "s|{name}|$RANDOM_NAME|g" \
-            -e "s|{random-name}|$(get_random_name)|g" \
-            -e "s|{random-number}|$RANDOM_NUMBER|g" \
-            -e "s|{sender-email}|$username@$domain|g" \
-            -e "s|{sender-name}|$SELECTED_SENDER_NAME|g" \
-            -e "s|{base64-encryptedrecipents-email}|$BASE64_EMAIL|g" \
-            "$HTML_TEMPLATE" > "$TEMP_HTML"
+        cat <<EOF | /usr/sbin/sendmail -t -oi
+--ALT_BOUNDARY
+Content-Type: text/html; charset=UTF-8
+
+$(cat "$TEMP_HTML")
+EOF
     fi
 
-    {
-        echo "Return-Path: <$username@$domain>"
-        echo "From: \"$SELECTED_SENDER_NAME\" <$username@$domain>"
-        echo "To: <$CLEAN_EMAIL>"
-        echo "Subject: $SELECTED_SUBJECT"
-        echo "MIME-Version: 1.0"
+    if [ "$ATTACHMENT_ENABLED" = true ]; then
+        FILE_NAME=$(basename "$ATTACHMENT_FILE")
+        cat <<EOF | /usr/sbin/sendmail -t -oi
+--MIXED_BOUNDARY
+Content-Type: application/octet-stream; name="$FILE_NAME"
+Content-Transfer-Encoding: base64
+Content-Disposition: attachment; filename="$FILE_NAME"
 
-        if [ "$ATTACHMENT_ENABLED" = true ]; then
-            BOUNDARY="====BOUNDARY_$(openssl rand -hex 8)==="
-            FILE_B64=$(base64 "$ATTACHMENT_FILE")
-            FILE_NAME=$(basename "$ATTACHMENT_FILE")
+$(base64 "$ATTACHMENT_FILE")
+EOF
+    fi
 
-            echo "Content-Type: multipart/mixed; boundary=\"$BOUNDARY\""
-            echo ""
-            echo "--$BOUNDARY"
-        else
-            echo "Content-Type: multipart/alternative; boundary=\"MULTIPART_BOUNDARY\""
-            echo ""
-            echo "--MULTIPART_BOUNDARY"
-        fi
-
-        echo "Content-Type: text/plain; charset=UTF-8"
-        echo ""
-        cat "$TEMP_TEXT"
-        echo ""
-
-        if [ "$SEND_AS_HTML" = true ]; then
-            echo "--${BOUNDARY:-MULTIPART_BOUNDARY}"
-            echo "Content-Type: text/html; charset=UTF-8"
-            echo ""
-            cat "$TEMP_HTML"
-            echo ""
-        fi
-
-        if [ "$ATTACHMENT_ENABLED" = true ]; then
-            echo "--$BOUNDARY"
-            echo "Content-Type: application/octet-stream; name=\"$FILE_NAME\""
-            echo "Content-Transfer-Encoding: base64"
-            echo "Content-Disposition: attachment; filename=\"$FILE_NAME\""
-            echo ""
-            echo "$FILE_B64"
-            echo ""
-            echo "--$BOUNDARY--"
-        else
-            echo "--MULTIPART_BOUNDARY--"
-        fi
-    } | /usr/sbin/sendmail -t -oi
+    cat <<EOF | /usr/sbin/sendmail -t -oi
+--ALT_BOUNDARY--
+--MIXED_BOUNDARY--
+EOF
 
     rm "$TEMP_TEXT" "$TEMP_HTML"
 
@@ -315,7 +304,6 @@ EOF
 
     sleep $(awk -v min=0.3 -v max=0.8 'BEGIN{srand(); print min+rand()*(max-min)}')
     echo "[$SUCCESS/$TOTAL] Sent to $CLEAN_EMAIL"
-
 done < "$EMAIL_LIST"
 
 echo "Completed at $(date)" >> "$LOG_FILE"
