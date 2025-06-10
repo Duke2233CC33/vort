@@ -1,0 +1,15 @@
+{date} → Current date (YYYY-MM-DD)
+
+{recipient-email} → Full recipient email
+
+{recipient-domain} → Domain part of email
+
+{recipient-user} → Username part of email
+
+{name} → Random name from your list
+
+{random-name} → Fresh random name for each occurrence
+
+{random-number} → 4-digit random number
+
+{base64-encryptedrecipents-email} → Base64 encoded email
